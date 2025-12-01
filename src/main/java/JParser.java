@@ -1,6 +1,7 @@
 import evaluator.Evaluator;
 import misc.EvalContext;
 import misc.Matrix;
+import misc.MathObject;
 import parser.Parser;
 import tokenizer.Tokenizer;
 
@@ -10,24 +11,20 @@ public abstract class JParser {
     public static Parser PARSER;
     private static boolean degrees;
 
-    public static Double evaluate(String expression) {
+    public static MathObject evaluate(String expression) {
         if (expression.trim().isEmpty()) {
-            return 0.0;
+            return new MathObject(0.0);
         }
         PARSER = new Parser(new Tokenizer(expression).tokenize());
-        double value = EVALUATOR.evaluate(PARSER.parseExpression(), CONTEXT);
-        if (Math.abs(value) <= 1e-5) {
-            return 0.0;
-        }
-        return value;
+        MathObject mathObject = EVALUATOR.evaluate(PARSER.parseExpression(), CONTEXT);
+//        if (Math.abs(value) <= 1e-5) {
+//            return new Rational(0.0);
+//        }
+        return mathObject;
     }
 
     public static void createFunction(String expression) {
         new Function(expression);
-    }
-
-    public static void addVariable(String name) {
-        CONTEXT.nativeVariables.add(name);
     }
 
     public static void changeDegrees(boolean degrees) {

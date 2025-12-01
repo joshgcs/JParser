@@ -14,8 +14,6 @@ public class EvalContext {
         put("e", 2.718281828459045235360287471352);
         put("pi", 3.1415926535897932384626433);
     }};
-
-    public List<String> nativeVariables = new ArrayList<>();
     public Map<String, FunctionDefinition> functions = new HashMap<>();
     public Map<String, Function<double[], Double>> nativeFunctions = new HashMap<>() {{
         put("cos", args -> Math.cos(args[0]));
