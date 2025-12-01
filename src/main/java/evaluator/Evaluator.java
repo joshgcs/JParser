@@ -12,10 +12,15 @@ public class Evaluator {
             return (double) lit.getValue();
         } else if (node instanceof VariableNode var) {
             if (!context.variables.containsKey(var.getName())) {
-                throw new RuntimeException("Unknown variable: " + var.getName());
+                if (!context.nativeVariables.contains(var.getName())) {
+                    throw new RuntimeException("Unknown variable: " + var.getName());
+                } else {
+
+                }
             }
             return context.variables.get(var.getName());
         } else if (node instanceof FunctionCallNode funcCall) {
+            String fname = funcCall.getName();
             double val = 0.0;
             if (context.containsFunction(funcCall.getName())) {
                 EvalContext childContext = new EvalContext(context);
@@ -27,6 +32,12 @@ public class Evaluator {
                     childContext.variables.put(functionDefinition.getParameters().get(i), evaluate(funcCall.getArgs().get(i), context));
                 }
                 val += evaluate(functionDefinition.getBody(), childContext);
+            } else if (context.containsNativeFunction(fname)) {
+                double[] args = new double[funcCall.getArgs().size()];
+                for (int i = 0; i < funcCall.getArgs().size(); i++) {
+                    args[i] = evaluate(funcCall.getArgs().get(i), context);
+                }
+                return context.callNativeFunction(fname, args);
             } else {
                 throw new RuntimeException("Unable to locate function " + funcCall.getName() + " in context");
             }
