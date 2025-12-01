@@ -13,7 +13,7 @@ This algorithm goes through 3 stages:
   - abs
   - sqrt, cbrt
   - Radians/degrees
-  - Any user defined functions\
+  - Any user defined functions
 
 **Matrices**:
 - Row reduction
