@@ -3,29 +3,78 @@ package misc;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Simple container for a numeric vector (ordered list of doubles) with basic
+ * mutation and inspection operations.
+ *
+ * <p>This class stores the vector elements in a mutable {@link List} of
+ * {@link Double}. It provides methods to set or append values, query the size
+ * and access the underlying list, and to check whether all elements are zero.
+ * Note: {@link #isZero()} uses exact equality against 0.0; consider using an
+ * epsilon comparison for floating-point tolerance if needed.</p>
+ */
 public class Vector {
+    /**
+     * Underlying list of elements comprising the vector.
+     */
     private List<Double> body = new ArrayList<>();
 
+    /**
+     * Construct a Vector backed by the provided list.
+     *
+     * @param body list of double values to use as the vector body; this reference
+     *             is used directly (no defensive copy)
+     */
     public Vector(List<Double> body) {
         this.body = body;
     }
 
+    /**
+     * Replace the value at the given index.
+     *
+     * @param pos   zero-based index of the element to replace
+     * @param value new value to set
+     * @throws IndexOutOfBoundsException if {@code pos} is out of range for the list
+     */
     public void setValue(int pos, double value) {
         this.body.set(pos, value);
     }
 
+    /**
+     * Append a value to the end of the vector.
+     *
+     * @param value value to append
+     */
     public void addValue(double value) {
         this.body.add(value);
     }
 
+    /**
+     * Return the number of elements in the vector.
+     *
+     * @return size of the vector
+     */
     public int getSize() {
         return body.size();
     }
 
+    /**
+     * Return the underlying list representing the vector body.
+     *
+     * <p>Note: the returned list is the actual internal list (no defensive copy),
+     * so callers modifying it will affect this Vector instance.</p>
+     *
+     * @return list of {@link Double} elements
+     */
     public List<Double> getBody() {
         return body;
     }
 
+    /**
+     * Check whether all elements in the vector are exactly zero.
+     *
+     * @return {@code true} if every element equals {@code 0.0}, {@code false} otherwise
+     */
     public boolean isZero() {
         for (Double doub : body) {
             if (doub != 0.0) {

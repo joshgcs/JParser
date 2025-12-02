@@ -7,19 +7,63 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Recursive-descent parser for mathematical expressions and simple function/matrix
+ * constructs.
+ *
+ * <p>This parser operates over a pre-tokenized input ({@link Token}) and builds
+ * an {@link ExpressionNode} AST. The grammar implemented (informally) is:
+ *
+ * <pre>
+ * expression  ::= sign
+ * sign        ::= term ( ( '>' | '>=' | '<=' | '<' | '==' | '!=' | '=' ) term )*
+ * term        ::= factor ( ('+' | '-') factor )*
+ * factor      ::= exponent ( ('*' | '/') exponent )*
+ * exponent    ::= unary ( '^' unary )*
+ * unary       ::= '-' unary | primary
+ * primary     ::= NUMBER | IDENTIFIER (function call or definition) | '(' expression ')' | vector/matrix
+ * </pre>
+ *
+ * <p>Function definitions are detected by checking the token after the closing
+ * parenthesis for an {@code '='} operator. The parser also inserts implicit
+ * multiplication when a number is directly followed by an identifier (e.g.
+ * {@code 2x} becomes {@code 2 * x}) by injecting an OperatorToken.</p>
+ */
 public class Parser {
 
+    /**
+     * Token stream to parse.
+     */
     private final List<Token> tokens;
+
+    /**
+     * Current position (index) within {@link #tokens}.
+     */
     private int position = 0;
 
+    /**
+     * Create a parser for the given token list.
+     *
+     * @param tokens the pre-tokenized input
+     */
     public Parser(List<Token> tokens){
         this.tokens = tokens;
     }
 
+    /**
+     * Entry point to parse a complete expression from the current token stream.
+     *
+     * @return root {@link ExpressionNode} of the parsed expression
+     */
     public ExpressionNode parseExpression() {
         return parseSign();
     }
 
+    /**
+     * Parse additions and subtractions (left-associative).
+     *
+     * @return parsed {@link ExpressionNode} for the term sequence
+     */
     private ExpressionNode parseTerm()  {
         ExpressionNode left = parseFactor();
 
@@ -32,6 +76,11 @@ public class Parser {
         return left;
     }
 
+    /**
+     * Parse multiplications and divisions (left-associative).
+     *
+     * @return parsed {@link ExpressionNode} for the factor sequence
+     */
     private ExpressionNode parseFactor() {
         ExpressionNode left = parseExponent();
 
@@ -44,6 +93,12 @@ public class Parser {
         return left;
     }
 
+    /**
+     * Parse exponentiation (right-associative in many grammars; implemented here
+     * as repeated binary nodes).
+     *
+     * @return parsed {@link ExpressionNode} for exponent expressions
+     */
     private ExpressionNode parseExponent() {
         ExpressionNode left = parseUnary();
 
@@ -56,6 +111,11 @@ public class Parser {
         return left;
     }
 
+    /**
+     * Parse comparison and equality operators (e.g. {@code >, >=, <=, <, ==, !=, =}).
+     *
+     * @return parsed {@link ExpressionNode} representing comparisons
+     */
     private ExpressionNode parseSign() {
         ExpressionNode left = parseTerm();
 
@@ -68,6 +128,17 @@ public class Parser {
         return left;
     }
 
+    /**
+     * Parse primary expressions:
+     * - NUMBER: produces {@link LiteralNode}. If the next token is an identifier,
+     *   implicit multiplication is inserted by adding a {@link OperatorToken} "*".
+     * - IDENTIFIER: delegates to {@link #parseIdentifierBasedExpression()} which
+     *   resolves variables, function calls and function definitions.
+     * - LPAREN: parses a parenthesized expression.
+     * - BEGVEC: parses a matrix/vector construct via {@link #parseMatrix()}.
+     *
+     * @return parsed primary {@link ExpressionNode}
+     */
     private ExpressionNode parsePrimary() {
         Token tok = current();
         switch (current().getType()) {
@@ -92,6 +163,11 @@ public class Parser {
         }
     }
 
+    /**
+     * Parse unary expressions. Currently only unary negation is supported.
+     *
+     * @return parsed {@link ExpressionNode} for unary expression
+     */
     private ExpressionNode parseUnary() {
         if (current() != null && current().getValue().equals(Operator.MINUS)) {
             consume();
@@ -100,6 +176,11 @@ public class Parser {
         return parsePrimary();
     }
 
+    /**
+     * Parse a matrix construct which consists of one or more vectors.
+     *
+     * @return {@link MatrixNode} representing the parsed matrix
+     */
     private ExpressionNode parseMatrix() {
         List<VectorNode> nodes = new ArrayList<>();
 
@@ -110,6 +191,11 @@ public class Parser {
         return new MatrixNode(nodes);
     }
 
+    /**
+     * Parse a vector body delimited by {@code BEGVEC} and {@code ENDVEC}.
+     *
+     * @return {@link VectorNode} containing parsed expressions for each element
+     */
     private VectorNode parseVector() {
         consume();
         List<ExpressionNode> body = new ArrayList<>();
@@ -121,6 +207,13 @@ public class Parser {
         return new VectorNode(body);
     }
 
+    /**
+     * Parse a function call given the function name. Expects the current token
+     * to be {@code LPAREN} when called (the method consumes the closing parenthesis).
+     *
+     * @param name function name
+     * @return {@link FunctionCallNode} with parsed argument list
+     */
     private ExpressionNode parseFunctionCall(String name) {
         consume();
         List<ExpressionNode> args = new ArrayList<>();
@@ -136,6 +229,14 @@ public class Parser {
         return new FunctionCallNode(name, args);
     }
 
+    /**
+     * Parse a function definition of the form: name(params...) = expression.
+     * The method expects that {@code LPAREN} is current when called and consumes
+     * tokens up to and including the function body expression.
+     *
+     * @param name function name
+     * @return {@link FunctionDefinitionNode} with parameter list and body
+     */
     private ExpressionNode parseFunctionDefinition(String name) {
         consume();
         List<String> params = new ArrayList<>();
@@ -164,6 +265,12 @@ public class Parser {
         return new FunctionDefinitionNode(name, params, body);
     }
 
+    /**
+     * Resolve an identifier; this may be a variable, or a function call/definition
+     * when followed by {@code LPAREN}.
+     *
+     * @return {@link VariableNode} or a function-related node
+     */
     private ExpressionNode parseIdentifierBasedExpression() {
         String name = current().getValue().toString();
         consume();
@@ -175,6 +282,13 @@ public class Parser {
         return new VariableNode(name);
     }
 
+    /**
+     * Decide whether the identifier with following parenthesis is a function
+     * definition or a call, then dispatch accordingly.
+     *
+     * @param name identifier name
+     * @return parsed function node
+     */
     private ExpressionNode parseFunctionBasedExpression(String name) {
         if (isFunctionDefinition()) {
             return parseFunctionDefinition(name);
@@ -183,6 +297,13 @@ public class Parser {
         }
     }
 
+    /**
+     * Detect whether the current identifier+parenthesis sequence is a function
+     * definition by finding the matching closing parenthesis and checking the
+     * subsequent token for an {@code '='} operator.
+     *
+     * @return true if a function definition pattern is detected
+     */
     private boolean isFunctionDefinition() {
         int closing = findClosingParenIndex(position);
         if (closing >= 0 && closing + 1 < tokens.size()) {
@@ -192,6 +313,14 @@ public class Parser {
         return false;
     }
 
+    /**
+     * Find the index of the matching closing parenthesis starting at {@code pos}.
+     * This method counts nested parentheses and returns the index of the closing
+     * parenthesis that matches the first opening parenthesis encountered.
+     *
+     * @param pos starting index (should point to an {@code LPAREN})
+     * @return index of matching {@code RPAREN} or -1 if not found
+     */
     private int findClosingParenIndex(int pos) {
         int depth = 0;
         for (int i = pos; i < tokens.size(); i++) {
@@ -206,10 +335,20 @@ public class Parser {
         return -1;
     }
 
+    /**
+     * Return the current token at {@link #position}.
+     *
+     * @return current {@link Token}
+     */
     private Token current() {
         return tokens.get(position);
     }
 
+    /**
+     * Peek at the next token without advancing the parser.
+     *
+     * @return next {@link Token} or {@code null} if at end of stream
+     */
     private Token peek() {
         if (position + 1 < tokens.size()) {
             return tokens.get(position + 1);
@@ -217,6 +356,11 @@ public class Parser {
         return null;
     }
 
+    /**
+     * Consume and return the current token, advancing the parser position.
+     *
+     * @return consumed {@link Token} or {@code null} if past end
+     */
     private Token consume() {
         if (position < tokens.size()) {
             Token toReturn = current();
@@ -226,6 +370,12 @@ public class Parser {
         return null;
     }
 
+    /**
+     * Check whether the current token's operator matches the provided operator.
+     *
+     * @param operator operator to compare with
+     * @return true if current token exists and has the given operator value
+     */
     private boolean match(Operator operator) {
         if (position < tokens.size()) {
             return current().getValue().equals(operator);
@@ -233,6 +383,12 @@ public class Parser {
         return false;
     }
 
+    /**
+     * Ensure the current token has the expected {@link TokenType}.
+     *
+     * @param type expected token type
+     * @throws RuntimeException if the current token type does not match
+     */
     private void expect(TokenType type) {
         if (!current().getType().equals(type)) {
             throw new RuntimeException("Error while parsing: token does not match expected type of " + type);

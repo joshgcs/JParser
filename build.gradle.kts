@@ -1,5 +1,6 @@
 plugins {
-    id("java")
+    `java-library`
+    `maven-publish`
 }
 
 group = "org.parser"
@@ -7,6 +8,21 @@ version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("JParser") {
+            from(components["java"])
+        }
+    }
+
+    repositories {
+        maven {
+            name = "myRepo"
+            url = uri(layout.buildDirectory.dir("repo"))
+        }
+    }
 }
 
 dependencies {

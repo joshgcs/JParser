@@ -1,4 +1,4 @@
-# JParser
+# evaluator.JParser
 Math expression parser and evaluator, written from scratch in Java.\
 \
 This algorithm goes through 3 stages:
@@ -23,11 +23,11 @@ This algorithm goes through 3 stages:
 **Matrix Math**
   ```
   Matrix matrix = new Matrix("[1 3 5][8 30 2][1 89 2]");
-  JParser.echelonForm(matrix); ->
+  evaluator.JParser.echelonForm(matrix); ->
     [1.0 8.0 1.0 ]
     [0.0 6.0 86.0 ]
     [0.0 0.0 541.6666666666666 ]
-  JParser.rowReduce(matrix); ->
+  evaluator.JParser.rowReduce(matrix); ->
     [1.0 0.0 0.0 ]
     [0.0 1.0 0.0 ]
     [0.0 0.0 1.0 ]
@@ -35,6 +35,6 @@ This algorithm goes through 3 stages:
 **User Defined Functions**
   ```
     String func = "f(x, y, z) = x^2 + 2z^3 - 8.2y^4";
-    JParser.createFunction(func); -> can be used in any context now.
-    JParser.evaluate("f(3, 5, 9)"); -> returns -4954.0
+    evaluator.JParser.createFunction(func); -> can be used in any context now.
+    evaluator.JParser.evaluate("f(3, 5, 9)"); -> returns -4954.0
   ```
