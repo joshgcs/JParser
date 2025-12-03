@@ -1,5 +1,6 @@
-package misc;
+package evaluator;
 
+import literals.FunctionDefinition;
 import nodes.ExpressionNode;
 import nodes.FunctionDefinitionNode;
 import parser.Parser;
@@ -62,6 +63,7 @@ public class EvalContext {
         put("log", args -> Math.log10(args[0]));
         // 'int' expects two args: upper and lower limits (placeholder implementation).
         put("int", args -> EvalContext.integral(args[0], args[1]));
+        put("fac", args -> EvalContext.factorial(args[0]));
     }};
 
     /** Optional parent context. When present, functions are inherited from the parent. */
@@ -112,7 +114,7 @@ public class EvalContext {
         if (root instanceof FunctionDefinitionNode functionDefinitionNode) {
             // Ensure duplicate function names are not added.
             if (functions.containsKey((String) functionDefinitionNode.getValue())) {
-                throw new RuntimeException("Function " + functionDefinitionNode.getValue() + " already exists in context");
+                throw new RuntimeException("literals.Function " + functionDefinitionNode.getValue() + " already exists in context");
             }
             FunctionDefinition def = defineFunction(functionDefinitionNode);
             def.setExpression(func);
@@ -188,5 +190,13 @@ public class EvalContext {
      */
     public static double integral(double upper, double lower) {
         return 0.0;
+    }
+
+    private static double factorial(double number) {
+        double val = 1;
+        for (double i = number; i > 0; i--) {
+            val *= i;
+        }
+        return val;
     }
 }

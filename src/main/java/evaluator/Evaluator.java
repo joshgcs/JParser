@@ -1,9 +1,8 @@
 package evaluator;
 
-import misc.EvalContext;
-import misc.FunctionDefinition;
-import misc.MathObject;
+import literals.MathObject;
 import nodes.*;
+import literals.FunctionDefinition;
 
 import java.math.BigDecimal;
 
@@ -113,7 +112,6 @@ public class Evaluator {
                 case GTE -> new MathObject((left.doubleValue() >= right.doubleValue() ? 1 : 0));
                 case LTE -> new MathObject((left.doubleValue() <= right.doubleValue() ? 1 : 0));
                 case NEQ -> new MathObject((left.doubleValue() != right.doubleValue() ? 1 : 0));
-                case FILLER -> new MathObject(0.0);
                 case EQUAL -> new MathObject((left == right ? 1 : 0));
                 case PEQUAL -> new MathObject(left.add(left.add(right)));
                 case EXP -> new MathObject(evalExponent(left.doubleValue(), right.doubleValue()));

@@ -13,7 +13,6 @@ public enum Operator {
     GTE(">="),
     LTE("<="),
     NEQ("!="),
-    FILLER("!"),
     EQUAL("="),
     PEQUAL("+="),
     EXP("^");

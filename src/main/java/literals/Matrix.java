@@ -1,4 +1,4 @@
-package misc;
+package literals;
 
 import evaluator.JParser;
 import nodes.*;
@@ -174,13 +174,16 @@ public class Matrix implements Cloneable{
         for (VectorNode vec : matrixNode.getVectorNodeList()) {
             List<BigDecimal> body = new ArrayList<>();
             for (ExpressionNode node : vec.getBody()) {
-                if (node instanceof BinaryNode bin && bin.getOperator().equals(Operator.MINUS)) {
+                if (node instanceof BinaryNode bin) {
                     BigDecimal dec1 = JParser.evaluate(bin.getLeftChild()).getValue();
                     BigDecimal dec2 = JParser.evaluate(bin.getRightChild()).getValue();
+                    if (bin.getOperator().equals(Operator.MINUS)) {
+                        dec2 = dec2.multiply(new BigDecimal("-1"));
+                    }
                     body.add(dec1);
                     body.add(dec2);
-                } else if (node instanceof UnaryNode un && un.getSymbol().equals(UnaryNode.UnarySymbol.NEGATIVE)) {
-                    body.add(((BigDecimal) un.getChild().getValue()).multiply(BigDecimal.valueOf(-1)));
+                } else if (node instanceof UnaryNode un) {
+                    body.add(JParser.evaluate(un).getValue());
                 } else if (node instanceof LiteralNode lit) {
                     if (JParser.isZero((BigDecimal) lit.getValue())) {
                         body.add(BigDecimal.valueOf(0.0).stripTrailingZeros());

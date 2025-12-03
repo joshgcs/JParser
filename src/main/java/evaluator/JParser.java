@@ -1,8 +1,7 @@
 package evaluator;
 
-import misc.EvalContext;
-import misc.Matrix;
-import misc.MathObject;
+import literals.Matrix;
+import literals.MathObject;
 import nodes.ExpressionNode;
 import parser.Parser;
 import tokenizer.Tokenizer;
@@ -62,7 +61,7 @@ public abstract class JParser {
      * <p>
      * This flag is available for future use by the evaluator/native functions that
      * perform trigonometric computations. Currently the flag is stored but not read
-     * by the native trig implementations in {@link misc.EvalContext}.
+     * by the native trig implementations in {@link evaluator.EvalContext}.
      * </p>
      */
     private static boolean degrees;
@@ -127,7 +126,7 @@ public abstract class JParser {
      *
      * <p>
      * Note: Native trig implementations must read this flag to change behavior; current
-     * built-in functions in {@link misc.EvalContext} use {@link Math} which expects radians.
+     * built-in functions in {@link evaluator.EvalContext} use {@link Math} which expects radians.
      * </p>
      *
      * @param degrees true to use degrees, false to use radians

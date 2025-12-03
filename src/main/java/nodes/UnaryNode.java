@@ -34,7 +34,7 @@ public class UnaryNode extends ExpressionNode{
         /**
          * Unary negation (negates numeric value).
          */
-        NEGATIVE
+        NEGATIVE;
     }
 
     /**

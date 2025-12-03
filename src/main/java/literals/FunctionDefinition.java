@@ -1,4 +1,4 @@
-package misc;
+package literals;
 
 import evaluator.JParser;
 import nodes.ExpressionNode;

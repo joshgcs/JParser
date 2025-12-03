@@ -1,7 +1,7 @@
 package evaluator;
 
-import misc.Matrix;
-import misc.Vector;
+import literals.Matrix;
+import literals.Vector;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -74,7 +74,6 @@ public abstract class MatrixMath {
             }
             cursor = rowIndex;
             format(matrix, cursor, columnIndex, rowIndex);
-            System.out.println(matrix);
             if (!JParser.isZero(matrix.getValue(rowIndex, columnIndex))) {
                 rowScale(matrix, rowIndex, BigDecimal.valueOf((1/matrix.getValue(rowIndex, columnIndex).doubleValue())));
             }
