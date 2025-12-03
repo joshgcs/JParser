@@ -22,9 +22,9 @@ public class Vector {
     /**
      * Underlying list of elements comprising the vector.
      */
-    private List<BigDecimal> body = new ArrayList<>();
+    private List<MathObject> body = new ArrayList<>();
 
-    public Vector(List<BigDecimal> body) {
+    public Vector(List<MathObject> body) {
         this.body = body;
     }
 
@@ -36,16 +36,11 @@ public class Vector {
      * @throws IndexOutOfBoundsException if {@code pos} is out of range for the list
      */
     public void setValue(int pos, BigDecimal value) {
-        this.body.set(pos, value);
+        this.body.set(pos, new MathObject(value));
     }
 
-    /**
-     * Append a value to the end of the vector.
-     *
-     * @param value value to append
-     */
-    public void addValue(double value) {
-        this.body.add(BigDecimal.valueOf(value));
+    public void setValue(int pos, MathObject object) {
+        this.body.set(pos, object);
     }
 
     /**
@@ -65,7 +60,7 @@ public class Vector {
      *
      * @return list of {@link Double} elements
      */
-    public List<BigDecimal> getBody() {
+    public List<MathObject> getBody() {
         return body;
     }
 
@@ -75,8 +70,8 @@ public class Vector {
      * @return {@code true} if every element equals {@code 0.0}, {@code false} otherwise
      */
     public boolean isZero() {
-        for (BigDecimal doub : body) {
-            if (JParser.isZero(doub)) {
+        for (MathObject object : body) {
+            if (JParser.isZero(object.getValue())) {
                 return false;
             }
         }

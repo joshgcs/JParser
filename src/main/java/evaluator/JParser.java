@@ -155,6 +155,16 @@ public abstract class JParser {
         return MatrixMath.reduceToEchelon(matrix);
     }
 
+    public static Matrix inverse(Matrix matrix) {
+        return MatrixMath.findInverse(matrix);
+    }
+
+    public static BigDecimal determinant(Matrix matrix) {
+        return MatrixMath.findDeterminant(matrix);
+    }
+
+
+
     /**
      * Determine whether a value should be considered zero (with epsilon tolerance).
      *

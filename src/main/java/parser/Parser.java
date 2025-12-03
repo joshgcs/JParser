@@ -161,6 +161,9 @@ public class Parser {
                 return parseMatrix();
             } case SPACE -> {
                 consume();
+                if (!inVector) {
+                    return new LiteralNode(0.0);
+                }
                 return new SpaceNode();
             }
             case null, default -> throw new RuntimeException("Invalid token type passed " + tok.getType());

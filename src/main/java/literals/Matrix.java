@@ -78,8 +78,12 @@ public class Matrix implements Cloneable{
      * @param col zero-based column index
      * @return the value at the specified position
      */
-    public BigDecimal getValue(int row, int col) {
+    public MathObject getValue(int row, int col, int... placeholder) {
         return columns.get(col).getBody().get(row);
+    }
+
+    public BigDecimal getValue(int row, int col) {
+        return columns.get(col).getBody().get(row).getValue();
     }
 
     /**
@@ -98,6 +102,14 @@ public class Matrix implements Cloneable{
             columns.get(col).setValue(row, value);
         } catch (IndexOutOfBoundsException e) {
             System.err.println("Position out of bounds");
+        }
+    }
+
+    public void setValue(int row, int col, MathObject object) {
+        try {
+            columns.get(col).setValue(row, object);
+        } catch (IndexOutOfBoundsException e) {
+            throw new RuntimeException("Position " + row + ", " + col + " out of bounds for matrix");
         }
     }
 
@@ -156,17 +168,25 @@ public class Matrix implements Cloneable{
         DecimalFormat df = new DecimalFormat("#." +  "#".repeat(JParser.getCurrentPrecision()));
         List<Vector> vectors = new ArrayList<>();
         for (VectorNode vectorNode : matrixNode.getVectorNodeList()) {
-            List<BigDecimal> body = new ArrayList<>();
+            List<MathObject> body = new ArrayList<>();
             for (ExpressionNode expressionNode : vectorNode.getBody()) {
                 if (expressionNode instanceof BinaryNode binaryNode) {
-                    BigDecimal decimal = JParser.evaluate(binaryNode).getValue();
-                    body.add(BigDecimal.valueOf(Double.parseDouble(df.format(decimal))).stripTrailingZeros());
+                    MathObject object = JParser.evaluate(binaryNode);
+                    if (object.getValue() != null) {
+                        object.setValue(object.getValue().stripTrailingZeros());
+                        body.add(object);
+                    } else {
+                        body.add(object);
+                    }
                 } else if (expressionNode instanceof LiteralNode literalNode) {
                     BigDecimal decimal = new BigDecimal(literalNode.getValue().toString());
-                    body.add(decimal.stripTrailingZeros());
+                    body.add(new MathObject(decimal.stripTrailingZeros()));
                 } else if (expressionNode instanceof UnaryNode unaryNode) {
                     BigDecimal decimal = JParser.evaluate(unaryNode).getValue();
-                    body.add(decimal.stripTrailingZeros());
+                    body.add(new MathObject(decimal.stripTrailingZeros()));
+                } else if (expressionNode instanceof VariableNode variableNode) {
+                    MathObject object = JParser.evaluate(variableNode);
+                    body.add(object);
                 }
             }
             vectors.add(new Vector(body));
@@ -185,7 +205,7 @@ public class Matrix implements Cloneable{
         for (int i = 0; i < this.getRowSize(); i++) {
             str.append("[");
             for (int j = 0; j < this.getColSize(); j++) {
-                str.append(getValue(i, j));
+                str.append(getValue(i, j, 0));
                 str.append(" ");
             }
             str.append("]");
@@ -216,9 +236,9 @@ public class Matrix implements Cloneable{
             Matrix clone = (Matrix) super.clone();
             List<Vector> cols = new ArrayList<>();
             for (Vector vector : this.columns) {
-                List<BigDecimal> body = new ArrayList<>();
-                for (BigDecimal decimal : vector.getBody()) {
-                    body.add(BigDecimal.valueOf(decimal.doubleValue()));
+                List<MathObject> body = new ArrayList<>();
+                for (MathObject object : vector.getBody()) {
+                    body.add(object);
                 }
                 cols.add(new Vector(body));
             }

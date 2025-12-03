@@ -94,8 +94,14 @@ public class Evaluator {
 
             if (leftObj.getName() != null || rightObj.getName() != null) {
                 // Symbolic binary operations.
+                if (leftObj.getValue() != null) {
+                    leftObj.setValue(leftObj.getValue().stripTrailingZeros());
+                }
+                if (rightObj.getValue() != null) {
+                    rightObj.setValue(rightObj.getValue().stripTrailingZeros());
+                }
                 String op = operatorToString(bin.getOperator());
-                String sym = "(" + leftObj + " " + op + " " + rightObj + ")";
+                String sym = leftObj + " " + op + " " + rightObj;
                 return new MathObject(sym);
             }
 

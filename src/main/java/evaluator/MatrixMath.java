@@ -1,5 +1,6 @@
 package evaluator;
 
+import literals.MathObject;
 import literals.Matrix;
 import literals.Vector;
 
@@ -124,6 +125,22 @@ public abstract class MatrixMath {
         return newMatrix;
     }
 
+    public static String findCharacteristicPolynomial(Matrix matrixToFind) {
+        Matrix matrix = matrixToFind.clone();
+        int colSize = matrix.getColSize();
+        int rowSize = matrix.getRowSize();
+
+        if (colSize != rowSize) {
+            throw new RuntimeException("Unable to find characteristic polynomial for non-square matrix");
+        }
+        for (int i = 0; i < colSize; i++) {
+            matrix.setValue(i, i, new MathObject(matrix.getValue(i, i) + " - λ"));
+        }
+        System.out.println(matrix);
+
+        return "";
+    }
+
     public static Vector findX(Matrix matrix, Vector b) {
         Matrix bAsMatrix = new Matrix(List.of(b));
         Matrix added = addMatricesTogether(matrix, bAsMatrix);
@@ -140,7 +157,44 @@ public abstract class MatrixMath {
         return BigDecimal.valueOf(Double.parseDouble(new DecimalFormat("#.#####").format(determinant.doubleValue()))).stripTrailingZeros();
     }
 
-    public static Matrix deleteRowCol(Matrix matrixToTransform, int row, int col) {
+    public static MathObject findDeterminantLaplace(Matrix matrixToFindDeterminate, int... colIdx) {
+        Matrix matrix = matrixToFindDeterminate.clone();
+
+        int colSize = matrix.getColSize();
+        int rowSize = matrix.getRowSize();
+        if (colIdx.length == 0) {
+            colIdx = new int[]{0};
+        }
+        if (colIdx[0] == colSize) {
+            return new MathObject(0.0);
+        }
+
+        if (colSize != rowSize) {
+            throw new RuntimeException("Unable to find determinate for non-square matrix");
+        }
+
+        BigDecimal scalar = matrix.getValue(0, colIdx[0]);
+        return new MathObject(cofactor(matrix, 0, colIdx[0]).getValue().multiply(scalar).add(findDeterminantLaplace(matrix, colIdx[0] + 1).getValue()));
+    }
+
+    private static MathObject cofactor(Matrix matrix, int row, int col) {
+        if (matrix.getValue(row, col) != null) {
+            return new MathObject(matrix.getValue(row, col).multiply(findDeterminant(deleteRowCol(matrix, row, col))).multiply(BigDecimal.valueOf(Math.pow(-1.0, row + col))));
+        } else {
+            return null;
+        }
+    }
+
+    private static Matrix multiplyMatrix(Matrix matrix, BigDecimal scalar) {
+        for (Vector vector : matrix.getColumns()) {
+            for (MathObject object : vector.getBody()) {
+                object.setValue(object.getValue().multiply(scalar));
+            }
+        }
+        return matrix;
+    }
+
+    private static Matrix deleteRowCol(Matrix matrixToTransform, int row, int col) {
         if (row >= matrixToTransform.getRowSize() || col >= matrixToTransform.getColSize() || row < 0 || col < 0) {
             throw new RuntimeException("Invalid row/column to remove");
         }
@@ -318,11 +372,13 @@ public abstract class MatrixMath {
         int idx = 0;
         for (Vector vector : matrix.getColumns()) {
             if (isNonZeroColumn(matrix, idx, 0)) {
-                for (BigDecimal d : vector.getBody()) {
-                    if (JParser.isZero(d)) {
+                for (MathObject d : vector.getBody()) {
+                    if (JParser.isZero(d.getValue())) {
                         vector.setValue(idx, BigDecimal.valueOf(Long.parseLong(df.format(0))));
+                    } else if (d.getValue() != null) {
+                        vector.setValue(idx, BigDecimal.valueOf(Double.parseDouble(df.format(d.getValue()))).stripTrailingZeros());
                     } else {
-                        vector.setValue(idx, BigDecimal.valueOf(Double.parseDouble(df.format(d))).stripTrailingZeros());
+                        vector.setValue(idx, d);
                     }
                     idx++;
                 }
