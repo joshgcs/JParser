@@ -109,6 +109,11 @@ public abstract class JParser {
         return EVALUATOR.evaluate(node, CONTEXT);
     }
 
+    public static MathObject findDerivative(String expression, String withRespectTo) {
+        ExpressionNode body = parse(expression);
+        return findDerivative(body, withRespectTo);
+    }
+
     /**
      * Create a new user-defined function from the given function definition expression.
      *
@@ -175,28 +180,51 @@ public abstract class JParser {
         return MatrixMath.findDeterminant(matrix);
     }
 
-    public static MathObject findDerivative(ExpressionNode root, String wrt) {
+    private static MathObject findDerivative(ExpressionNode root, String wrt) {
         parseThroughTree(root);
         MathObject derivative = new MathObject("");
         if (root instanceof BinaryNode binaryNode) {
             ExpressionNode left = binaryNode.getLeftChild();
             ExpressionNode right = binaryNode.getRightChild();
-            switch (binaryNode.getOperator()) {
-                case PLUS -> derivative.operation(differentiateExpression(left, right, Operator.PLUS, wrt), "+");
-                case EXP -> derivative.operation(differentiateExpression(left, right, Operator.EXP, wrt), "+");
-                case MULT -> derivative.operation(differentiateExpression(left, right, Operator.MULT, wrt), "+");
-                case MINUS -> derivative.operation(differentiateExpression(left, right, Operator.MINUS, wrt), "+");
-                case DIV -> derivative.operation(differentiateExpression(left, right, Operator.DIV, wrt), "+");
-            }
+            derivative.operation(differentiateExpression(left, right, binaryNode.getOperator(), wrt), "+");
         } else if (root instanceof LiteralNode literalNode) {
-            return new MathObject(((BigDecimal) literalNode.getValue()).stripTrailingZeros());
+            if (literalNode.getParent() != null) {
+                if (literalNode.getParent() instanceof BinaryNode bin) {
+                    if (bin.getOperator().equals(Operator.PLUS) || bin.getOperator().equals(Operator.MINUS)) {
+                        return new MathObject(0);
+                    } else {
+                        return new MathObject(((BigDecimal) literalNode.getValue()).stripTrailingZeros());
+                    }
+                }
+            }
+            return new MathObject(0);
         } else if (root instanceof VariableNode variableNode) {
+            if (!variableNode.getName().equals(wrt)) {
+                return new MathObject(0);
+            } if (variableNode.getParent() != null) {
+                if (variableNode.getParent() instanceof BinaryNode binaryNode) {
+                    if (binaryNode.getOperator().equals(Operator.PLUS) || binaryNode.getOperator().equals(Operator.MINUS)) {
+                        return new MathObject("1");
+                    }
+                } else if (variableNode.getParent() instanceof UnaryNode unaryNode) {
+                    if (unaryNode.getSymbol().equals(UnaryNode.UnarySymbol.NEGATIVE)) {
+                        return new MathObject("-1");
+                    }
+                    return new MathObject("1");
+                }
+            }
             return new MathObject(variableNode.getName());
+        } else if (root instanceof UnaryNode unaryNode) {
+            if (unaryNode.getSymbol().equals(UnaryNode.UnarySymbol.NEGATIVE)) {
+                return new MathObject("-" + findDerivative(unaryNode.getChild(), wrt));
+            } else {
+                return findDerivative(unaryNode.getChild(), wrt);
+            }
         }
         return derivative;
     }
 
-    public static MathObject differentiateExpression(ExpressionNode left, ExpressionNode right, Operator operator, String wrt) {
+    private static MathObject differentiateExpression(ExpressionNode left, ExpressionNode right, Operator operator, String wrt) {
         MathObject differentiated = new MathObject("");
         if (left instanceof BinaryNode) {
             differentiated.operation(findDerivative(left, wrt), "+");
@@ -204,83 +232,103 @@ public abstract class JParser {
         if (right instanceof BinaryNode) {
             differentiated.operation(findDerivative(right, wrt), "+");
         }
-        switch (operator) {
-            case EXP -> {
-                MathObject variable = evaluate(left);
-                MathObject exp = evaluate(right);
-                MathObject expReduced = new MathObject(exp.getValue());
-                if (exp.getValue() != null) {
-                    exp.setValue(exp.getValue().stripTrailingZeros());
-                }
-                exp.setName(exp.toString());
-                exp.operation(variable, "");
-                differentiated.combine(exp);
-                expReduced.operation(new MathObject(ONE), "-");
-                if (expReduced.getValue() != null) {
-                    if (expReduced.getValue().doubleValue() > 1) {
-                        expReduced.setValue(expReduced.getValue().stripTrailingZeros());
-                        differentiated.operation(expReduced, "^");
-                    }
-                }
-            } case MULT -> {
-                MathObject leftObject = evaluate(left);
-                if (!differentiated.getName().isEmpty()) {
-                    differentiated.addParenthesis();
-                }
-                if (leftObject.getValue() != null) {
-                    leftObject.setValue(leftObject.getValue().stripTrailingZeros());
-                }
-                differentiated = MathObject.combine(leftObject, differentiated);
-            } case MINUS, PLUS -> {
-                MathObject leftObject = findDerivative(left, wrt);
-                MathObject rightObject = findDerivative(right, wrt);
-                MathObject combined = new MathObject("");
-                if (leftObject.isCharacter()) {
-                    System.out.println(leftObject);
-                } else if (rightObject.isCharacter()) {
-                    if (!leftObject.isCharacter()) {
-                        if (rightObject.toString().equals(wrt)) {
-                            combined.combine(new MathObject(1), (operator.equals(Operator.MINUS) ? "-" : ""));
-                        } else {
-                            combined.combine(rightObject, (operator.equals(Operator.MINUS) ? "-" : ""));
-                        }
-                    }
-                }
-                differentiated = combined;
-            } case DIV -> {
-                MathObject leftObject = evaluate(left);
-                MathObject rightObject = evaluate(right);
-                leftObject.addParenthesis();
-                rightObject.addParenthesis();
 
-                MathObject fx = findDerivative(left, wrt);
-                fx.addParenthesis();
-                MathObject gx = findDerivative(right, wrt);
-                gx.addParenthesis();
+        return switch (operator) {
+            case EXP -> differentiateExp(left, right, wrt);
+            case MULT -> differentiateMult(differentiated, left);
+            case MINUS, PLUS -> differentiateAddSub(left, right, operator, wrt);
+            case DIV -> differentiateDiv(left, right, wrt);
+            default -> differentiated;
+        };
+    }
 
-                MathObject topLeft = MathObject.combine(fx, rightObject);
-                MathObject topRight = MathObject.combine(leftObject, gx);
+    private static MathObject differentiateExp(ExpressionNode left, ExpressionNode right, String wrt) {
+        MathObject variable = evaluate(left);
+        MathObject exp = evaluate(right);
 
-                MathObject bottom = MathObject.combine(rightObject, new MathObject("^2"));
+        if (!variable.toString().equals(wrt)) {
+            return new MathObject(0);
+        }
 
-                topLeft.combine(topRight, "-");
-                topLeft.addParenthesis();
-                topLeft.combine(bottom, "/");
-                topLeft.addParenthesis();
-                differentiated = topLeft;
-            }
+        if (exp.getValue() != null) {
+            exp.setValue(exp.getValue().stripTrailingZeros());
+        }
+        exp.setName(exp.toString());
+        exp.operation(variable, "");
+        MathObject differentiated = new MathObject("");
+        differentiated.combine(exp);
+
+        MathObject expReduced = new MathObject(exp.getValue());
+        expReduced.operation(new MathObject(ONE), "-");
+        if (expReduced.getValue() != null && expReduced.getValue().doubleValue() > 1) {
+            expReduced.setValue(expReduced.getValue().stripTrailingZeros());
+            differentiated.operation(expReduced, "^");
         }
         return differentiated;
     }
 
-    public static MathObject differentiateValue(ExpressionNode value, String wrt) {
-        MathObject differentiated = new MathObject("");
-
-        System.out.println(value.getValue());
-
-
-        return differentiated;
+    private static MathObject differentiateMult(MathObject accumulated, ExpressionNode left) {
+        MathObject leftObject = evaluate(left);
+        if (!accumulated.getName().isEmpty()) {
+            accumulated.addParenthesis();
+        }
+        if (leftObject.getValue() != null) {
+            leftObject.setValue(leftObject.getValue().stripTrailingZeros());
+        }
+        return MathObject.combine(leftObject, accumulated);
     }
+
+    private static MathObject differentiateAddSub(ExpressionNode left, ExpressionNode right, Operator operator, String wrt) {
+        MathObject leftObject = findDerivative(left, wrt);
+        MathObject rightObject = findDerivative(right, wrt);
+
+        if (rightObject.toString().isEmpty()) {
+            rightObject = new MathObject(0);
+        } else if (leftObject.toString().isEmpty()) {
+            leftObject = new MathObject(0);
+        }
+
+        MathObject combined = new MathObject("");
+        if (leftObject.isCharacter()) {
+            if (rightObject.isCharacter()) {
+                leftObject.combine(rightObject, Operator.getFromOperator(operator));
+                combined.combine(leftObject);
+            } else {
+                combined.combine(leftObject);
+            }
+        } else if (rightObject.isCharacter()) {
+            if (!leftObject.isCharacter()) {
+                if (rightObject.toString().equals(wrt)) {
+                    combined.combine(new MathObject(1), (operator.equals(Operator.MINUS) ? "-" : ""));
+                } else {
+                    combined.combine(rightObject, (operator.equals(Operator.MINUS) ? "-" : ""));
+                }
+            }
+        }
+        return combined;
+    }
+
+    private static MathObject differentiateDiv(ExpressionNode left, ExpressionNode right, String wrt) {
+        MathObject leftObject = evaluate(left);
+        MathObject rightObject = evaluate(right);
+        leftObject.addParenthesis();
+        rightObject.addParenthesis();
+
+        MathObject fx = findDerivative(left, wrt);
+        fx.addParenthesis();
+        MathObject gx = findDerivative(right, wrt);
+        gx.addParenthesis();
+
+        MathObject topLeft = MathObject.combine(fx, rightObject, " * ");
+        MathObject topRight = MathObject.combine(leftObject, gx, " * ");
+
+        MathObject bottom = MathObject.combine(rightObject, new MathObject("^2"));
+        MathObject top = MathObject.combine(topLeft, topRight, " - ");
+        top.addParenthesis();
+        bottom.addParenthesis();
+        return MathObject.combine(top, bottom, " / ");
+    }
+
 
     public static List<MathObject> findRoots(String expression, String... variables) {
         ExpressionNode body = createFunction(createFunctionFromPolynomial(expression, variables));
@@ -289,7 +337,6 @@ public abstract class JParser {
         int degree = findPolynomialDegree(body);
         BigDecimal lastValue;
         while (rootsFound < degree) {
-
 
             rootsFound++;
         }
@@ -301,19 +348,13 @@ public abstract class JParser {
         if (root instanceof BinaryNode binaryNode) {
             binaryNode.getLeftChild().setParent(binaryNode);
             binaryNode.getRightChild().setParent(binaryNode);
-            System.out.println(binaryNode.getOperator());
-            System.out.println(binaryNode.getLeftChild().getValue());
-            System.out.println(binaryNode.getLeftChild().getValue());
             return parseThroughTree(binaryNode.getLeftChild()) + Operator.getFromOperator(binaryNode.getOperator()) + parseThroughTree(binaryNode.getRightChild());
         } else if (root instanceof LiteralNode literalNode) {
-            System.out.println(literalNode.getValue());
             return literalNode.getValue().toString();
         } else if (root instanceof UnaryNode unaryNode) {
-            System.out.println(unaryNode.getValue());
             unaryNode.getChild().setParent(unaryNode);
             return parseThroughTree(unaryNode.getChild());
         } else if (root instanceof VariableNode variableNode) {
-            System.out.println(variableNode.getName());
             return variableNode.getValue().toString();
         } else {
             return "";

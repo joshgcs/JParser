@@ -56,7 +56,12 @@ public class Evaluator {
                 }
 
                 // Evaluate the function body.
-                val += evaluate(functionDefinition.getBody(), childContext).getValue().doubleValue();
+                MathObject evaluated = evaluate(functionDefinition.getBody(), childContext);
+                if (evaluated.getValue() != null) {
+                    val += evaluated.getValue().doubleValue();
+                } else {
+                    return evaluated;
+                }
             } else if (context.containsNativeFunction(fname)) {
                 // Evaluate native functions.
                 double[] args = new double[funcCall.getArgs().size()];
@@ -102,7 +107,11 @@ public class Evaluator {
                 }
                 String op = operatorToString(bin.getOperator());
                 String sym;
-                sym = leftObj + " " + op + " " + rightObj;
+                if (op.equals("*")) {
+                    sym = leftObj + "" + rightObj;
+                } else {
+                    sym = leftObj + "" + op + "" + rightObj;
+                }
                 return new MathObject(sym);
             }
 

@@ -104,6 +104,11 @@ public class MathObject {
         return newObject;
     }
 
+    public static MathObject combine(MathObject object1, MathObject object2, String string) {
+        MathObject object = object1.combine(object2, string);
+        return object;
+    }
+
     public MathObject operation(MathObject object, String operator) {
         if (this.getName() != null) {
             if (object.getName() != null && !this.getName().isEmpty()) {
