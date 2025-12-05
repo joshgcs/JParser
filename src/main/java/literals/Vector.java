@@ -28,6 +28,12 @@ public class Vector {
         this.body = body;
     }
 
+    public Vector(double... values) {
+        for (double doub : values) {
+            this.body.add(new MathObject(doub));
+        }
+    }
+
     /**
      * Replace the value at the given index.
      *
@@ -71,7 +77,7 @@ public class Vector {
      */
     public boolean isZero() {
         for (MathObject object : body) {
-            if (JParser.isZero(object.getValue())) {
+            if (JParser.isZero(object)) {
                 return false;
             }
         }

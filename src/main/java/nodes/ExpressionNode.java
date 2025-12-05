@@ -34,6 +34,16 @@ public abstract class ExpressionNode {
         SPACE
     }
 
+    protected ExpressionNode parent;
+
+    public ExpressionNode getParent() {
+        return parent;
+    }
+
+    public void setParent(ExpressionNode parent) {
+        this.parent = parent;
+    }
+
     /**
      * Return the specific NodeType of this node instance.
      *

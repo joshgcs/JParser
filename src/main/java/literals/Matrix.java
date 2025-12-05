@@ -82,8 +82,8 @@ public class Matrix implements Cloneable{
         return columns.get(col).getBody().get(row);
     }
 
-    public BigDecimal getValue(int row, int col) {
-        return columns.get(col).getBody().get(row).getValue();
+    public MathObject getValue(int row, int col) {
+        return columns.get(col).getBody().get(row);
     }
 
     /**
@@ -236,10 +236,7 @@ public class Matrix implements Cloneable{
             Matrix clone = (Matrix) super.clone();
             List<Vector> cols = new ArrayList<>();
             for (Vector vector : this.columns) {
-                List<MathObject> body = new ArrayList<>();
-                for (MathObject object : vector.getBody()) {
-                    body.add(object);
-                }
+                List<MathObject> body = new ArrayList<>(vector.getBody());
                 cols.add(new Vector(body));
             }
             clone.setColumns(cols);

@@ -1,6 +1,8 @@
 package literals;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Represents either a named variable or a numeric constant used in mathematical
@@ -50,6 +52,10 @@ public class MathObject {
         this.value = value;
     }
 
+    public boolean isCharacter() {
+        return this.name != null;
+    }
+
     /**
      * Returns the variable name stored in this object.
      *
@@ -73,6 +79,73 @@ public class MathObject {
 
     public void setValue(BigDecimal value) {
         this.value = value;
+    }
+
+    public void setValue(MathObject object) {
+        this.name = object.getName();
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public MathObject combine(MathObject object) {
+        this.setName(this + object.toString());
+        return this;
+    }
+
+    public MathObject combine(MathObject object, String string) {
+        this.setName(this + string + object.toString());
+        return this;
+    }
+
+    public static MathObject combine(MathObject object1, MathObject object2) {
+        MathObject newObject = object1.combine(object2);
+        return newObject;
+    }
+
+    public MathObject operation(MathObject object, String operator) {
+        if (this.getName() != null) {
+            if (object.getName() != null && !this.getName().isEmpty()) {
+                this.name = this.name + (object.getName().isEmpty() ? "" : operator + object.getName());
+            } else if (!this.getName().isEmpty() && object.getValue() != null){
+                this.name = this.name + operator + object.getValue();
+            } else if (object.getName() != null && this.getName().isEmpty()){
+                if (operator.equals("-")) {
+                    this.name = "-" + object.getName();
+                } else {
+                    this.name = object.getName();
+                }
+            } else {
+                this.name = "";
+            }
+        } else if (this.getValue() != null) {
+            BigDecimal newVal = this.value;
+            if (object.getValue() != null) {
+                if (operator.equals("-")) {
+                    newVal = this.value.subtract(object.getValue());
+                } else if (operator.equals("+")) {
+                    newVal = this.value.add(object.getValue());
+                } else if (operator.equals("*")) {
+                    newVal = this.value.multiply(object.getValue());
+                }
+                this.value = newVal;
+            } else {
+                if (this.name != null && this.name.isEmpty()) {
+                    this.name = object.getValue().toString();
+                } else {
+                    this.name = this.value.toString() + operator + (object.getValue());
+                }
+            }
+        }
+        return this;
+    }
+
+    public void addParenthesis() {
+        if (this.name == null) {
+            this.name = this.value.toString();
+        }
+        this.name = "(" + this.name + ")";
     }
 
     /**

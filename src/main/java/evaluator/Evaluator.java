@@ -3,6 +3,7 @@ package evaluator;
 import literals.MathObject;
 import nodes.*;
 import literals.FunctionDefinition;
+import tokenizer.Operator;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -91,7 +92,6 @@ public class Evaluator {
             // Handle binary operations (e.g., addition, subtraction, multiplication, etc.).
             MathObject leftObj = evaluate(bin.getLeftChild(), context);
             MathObject rightObj = evaluate(bin.getRightChild(), context);
-
             if (leftObj.getName() != null || rightObj.getName() != null) {
                 // Symbolic binary operations.
                 if (leftObj.getValue() != null) {
@@ -101,7 +101,8 @@ public class Evaluator {
                     rightObj.setValue(rightObj.getValue().stripTrailingZeros());
                 }
                 String op = operatorToString(bin.getOperator());
-                String sym = leftObj + " " + op + " " + rightObj;
+                String sym;
+                sym = leftObj + " " + op + " " + rightObj;
                 return new MathObject(sym);
             }
 

@@ -25,6 +25,8 @@ public class Tokenizer {
      */
     private int position = 0;
 
+    private boolean inVector = false;
+
     /**
      * Cached list of operator string representations to match against input.
      */
@@ -127,9 +129,14 @@ public class Tokenizer {
                 }
                 // Vector delimiters '[' or ']'
                 else if (currentChar.equals('[') || currentChar.equals(']')) {
+                    if (currentChar.equals('[')) {
+                        inVector = true;
+                    } else if (currentChar.equals(']')) {
+                        inVector = false;
+                    }
                     sb.append(currentChar);
                     tokens.add(new VectorToken(sb.toString()));
-                } else if (currentChar.equals(' ')) {
+                } else if (currentChar.equals(' ') && inVector) {
                     tokens.add(new SpaceToken());
                 }
                 // Advance to next character and reset the buffer

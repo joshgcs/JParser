@@ -1,8 +1,11 @@
 package parser;
 
+import evaluator.JParser;
+import literals.MathObject;
 import nodes.*;
 import tokenizer.*;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -57,7 +60,9 @@ public class Parser {
      * @return root {@link ExpressionNode} of the parsed expression
      */
     public ExpressionNode parseExpression() {
-        return parseSign();
+        ExpressionNode body = parseSign();
+        JParser.parseThroughTree(body);
+        return body;
     }
 
     /**
@@ -89,6 +94,9 @@ public class Parser {
             Token token = consume();
             ExpressionNode right = parseExponent();
             left = new BinaryNode(token, left, right);
+            if (((BinaryNode) left).getRightChild() instanceof VariableNode variableNode) {
+                variableNode.setCoefficient(JParser.evaluate(((BinaryNode) left).getLeftChild()));
+            }
         }
 
         return left;
@@ -107,6 +115,13 @@ public class Parser {
             Token token = consume();
             ExpressionNode right = parseUnary();
             left = new BinaryNode(token, left, right);
+            if (((BinaryNode) left).getLeftChild() instanceof VariableNode variableNode) {
+                if (((BinaryNode) left).getRightChild().getValue() instanceof BigDecimal) {
+                    variableNode.setExponent(new MathObject((BigDecimal) ((BinaryNode) left).getRightChild().getValue()));
+                } else {
+                    variableNode.setExponent(new MathObject((String) ((BinaryNode) left).getRightChild().getValue()));
+                }
+            }
         }
 
         return left;
@@ -141,10 +156,15 @@ public class Parser {
      * @return parsed primary {@link ExpressionNode}
      */
     private ExpressionNode parsePrimary() {
+        while (current().getType().equals(TokenType.RPAREN)) {
+            consume();
+        }
         Token tok = current();
         switch (current().getType()) {
             case NUMBER -> {
                 if (Objects.requireNonNull(peek()).getType().equals(TokenType.IDENTIFIER)) {
+                    tokens.add(position + 1, new OperatorToken("*", Operator.MULT));
+                } else if (Objects.requireNonNull(peek()).getType().equals(TokenType.LPAREN)) {
                     tokens.add(position + 1, new OperatorToken("*", Operator.MULT));
                 }
                 consume();
@@ -154,7 +174,6 @@ public class Parser {
             } case LPAREN -> {
                 consume();
                 ExpressionNode node = parseExpression();
-                expect(TokenType.RPAREN);
                 consume();
                 return node;
             } case BEGVEC -> {

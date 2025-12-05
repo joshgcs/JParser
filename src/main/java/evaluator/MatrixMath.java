@@ -5,57 +5,11 @@ import literals.Matrix;
 import literals.Vector;
 
 import java.math.BigDecimal;
-import java.math.MathContext;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.util.List;
 
 public abstract class MatrixMath {
-    /**
-     * Reduce the matrix to echelon form (not necessarily reduced row-echelon).
-     *
-     * <p>
-     * This method performs an in-place transformation and returns the same instance for convenience.
-     * The algorithm walks rows top-to-bottom and finds pivots, swapping and scaling rows as needed.
-     * </p>
-     *
-     * @param matrixToTransform the matrix to reduce
-     * @return the same matrix instance in echelon form (or partially reduced)
-     */
-    public static Matrix reduceToEchelon(Matrix matrixToTransform) {
-        Matrix matrix = matrixToTransform.clone();
-        MathContext mc = new MathContext(JParser.getCurrentPrecision(), RoundingMode.HALF_UP) ;
-        int colIndex = 0;
-
-        int rowSize = matrix.getRowSize();
-        int colSize = matrix.getColSize();
-
-        int rowToSwap;
-        int pivotPos;
-
-        for (int rowIndex = 0; rowIndex < rowSize; rowIndex++) {
-
-            rowToSwap = rowIndex;
-            if (colIndex > colSize - 1) {
-                break;
-            }
-            format(matrix, rowToSwap, colIndex, rowIndex);
-            pivotPos = getPivotColumn(matrix, rowIndex);
-            int idx = rowIndex + 1;
-            while (isNonZeroColumn(matrix, pivotPos, rowIndex + 1)) {
-                BigDecimal scalar = matrix.getValue(idx, pivotPos).divide(matrix.getValue(rowIndex, pivotPos), mc);
-                rowAddScale(matrix, rowIndex, idx, scalar.multiply(BigDecimal.valueOf(-1)));
-                idx++;
-                if (idx >= rowSize) {
-                    break;
-                }
-            }
-            colIndex++;
-        }
-        prettify(matrix);
-        return matrix;
-    }
-
     /**
      * Perform full row reduction (Gaussian elimination to reduced row-echelon form).
      *
@@ -70,18 +24,17 @@ public abstract class MatrixMath {
         int rowSize = matrix.getRowSize();
         int colSize = matrix.getColSize();
 
+        format(matrix);
         for (int rowIndex = 0; rowIndex < rowSize; rowIndex++) {
             if (colSize <= columnIndex) {
                 break;
             }
-            cursor = rowIndex;
-            format(matrix, cursor, columnIndex, rowIndex);
             if (!JParser.isZero(matrix.getValue(rowIndex, columnIndex))) {
-                rowScale(matrix, rowIndex, BigDecimal.valueOf((1/matrix.getValue(rowIndex, columnIndex).doubleValue())));
+                rowScale(matrix, rowIndex, BigDecimal.valueOf((1/matrix.getValue(rowIndex, columnIndex).getValue().doubleValue())));
             }
             for (cursor = 0; cursor < rowSize; cursor++) {
                 if (cursor != rowIndex) {
-                    rowAddScale(matrix, rowIndex, cursor, (matrix.getValue(cursor, columnIndex).multiply(BigDecimal.valueOf(-1))));
+                    rowAddScale(matrix, rowIndex, cursor, (matrix.getValue(cursor, columnIndex).getValue().multiply(BigDecimal.valueOf(-1))));
                 }
             }columnIndex++;
         }
@@ -100,12 +53,91 @@ public abstract class MatrixMath {
             throw new RuntimeException("Unable to invert non-square matrix");
         }
 
+        if (JParser.isZero(findDeterminant(matrix))) {
+            throw new RuntimeException("Cannot find inverse of matrix with determinant = 0");
+        }
+
         Matrix identity = Matrix.createIdentityMatrix(colSize);
         Matrix inverse = rowReduce(addMatricesTogether(matrixToFindInverse, identity));
         for (int i = 0; i < colSize; i++) {
             inverse.removeVector(inverse.getColumns().removeFirst());
         }
         return inverse;
+    }
+
+    public static Matrix makeTriangular(Matrix matrixToTransform) {
+        Matrix matrix = matrixToTransform.clone();
+        int rowSize = matrix.getRowSize();
+        int colSize = matrix.getColSize();
+        format(matrix);
+        for (int colIdx = 0; colIdx < colSize; colIdx++) {
+            for (int rowIdx = rowSize - 1; rowIdx > colIdx; rowIdx--) {
+                if (JParser.isZero(matrix.getValue(rowIdx, colIdx))) {
+                    continue;
+                }
+                MathObject x = matrix.getValue(rowIdx, colIdx);
+                MathObject y = matrix.getValue(rowIdx - 1, colIdx);
+                if (x.getValue() != null && y.getValue() != null) {
+                    BigDecimal xVal = x.getValue();
+                    BigDecimal yVal = y.getValue();
+                    rowScale(matrix, rowIdx, yVal.multiply(JParser.NEGATIVE_ONE).divide(xVal, 10, RoundingMode.HALF_UP));
+                    rowAdd(matrix, rowIdx, rowIdx - 1);
+                    rowScale(matrix, rowIdx, xVal.multiply(JParser.NEGATIVE_ONE).divide(yVal, 10, RoundingMode.HALF_UP));
+                }
+            }
+        }
+        prettify(matrix);
+        return matrix;
+    }
+
+    private static boolean isUpperTriangular(Matrix matrix) {
+        if (matrix.getRowSize() < 2) {
+            return false;
+        }
+
+        for (int i = 0; i < matrix.getRowSize(); i++) {
+            for (int j = 0; j < i; j++) {
+                if (!JParser.isZero(matrix.getValue(i, j))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static boolean isLowerTriangle(Matrix matrix) {
+        if (matrix.getRowSize() < 2) {
+            return false;
+        }
+
+        for (int i = 0; i < matrix.getRowSize(); i++) {
+            for (int j = 0; i > j; j++) {
+                if (JParser.isZero(matrix.getValue(j, i))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static void format(Matrix matrix) {
+        int rowSize = matrix.getRowSize();
+        int cursor;
+        int pivotPos;
+        for (int rowIdx = 0; rowIdx < rowSize; rowIdx++) {
+            cursor = rowIdx;
+            pivotPos = getPivotColumn(matrix, rowIdx);
+            while (pivotPos > 0) {
+                cursor++;
+                if (cursor < rowSize) {
+                    pivotPos = getPivotColumn(matrix, cursor);
+                } else {
+                    cursor--;
+                    break;
+                }
+            }
+            rowSwap(matrix, rowIdx, cursor);
+        }
     }
 
     private static Matrix addMatricesTogether(Matrix m1, Matrix m2) {
@@ -134,55 +166,75 @@ public abstract class MatrixMath {
             throw new RuntimeException("Unable to find characteristic polynomial for non-square matrix");
         }
         for (int i = 0; i < colSize; i++) {
-            matrix.setValue(i, i, new MathObject(matrix.getValue(i, i) + " - λ"));
+            matrix.setValue(i, i, new MathObject(matrix.getValue(i, i) + "-λ"));
         }
-        System.out.println(matrix);
 
-        return "";
+        return findDeterminantLaplace(matrix).toString();
     }
 
-    public static Vector findX(Matrix matrix, Vector b) {
+    public static Vector findAxb(Matrix matrix, Vector b) {
         Matrix bAsMatrix = new Matrix(List.of(b));
         Matrix added = addMatricesTogether(matrix, bAsMatrix);
         return rowReduce(added).getColumns().getLast();
     }
 
-    public static BigDecimal findDeterminant(Matrix matrixToFindDeterminant) {
+    public static MathObject findDeterminant(Matrix matrixToFindDeterminant) {
 
-        BigDecimal determinant = new BigDecimal("1.0");
-        Matrix echelon = reduceToEchelon(matrixToFindDeterminant);
+        MathObject determinant = new MathObject(1);
+        Matrix echelon = makeTriangular(matrixToFindDeterminant);
         for (int i = 0; i < matrixToFindDeterminant.getColSize(); i++) {
-            determinant = determinant.multiply(echelon.getValue(i, i));
+            determinant.operation(echelon.getValue(i, i), "*");
         }
-        return BigDecimal.valueOf(Double.parseDouble(new DecimalFormat("#.#####").format(determinant.doubleValue()))).stripTrailingZeros();
+        return determinant;
     }
 
     public static MathObject findDeterminantLaplace(Matrix matrixToFindDeterminate, int... colIdx) {
-        Matrix matrix = matrixToFindDeterminate.clone();
-
-        int colSize = matrix.getColSize();
-        int rowSize = matrix.getRowSize();
+        int colSize = matrixToFindDeterminate.getColSize();
+        int rowSize = matrixToFindDeterminate.getRowSize();
         if (colIdx.length == 0) {
             colIdx = new int[]{0};
         }
         if (colIdx[0] == colSize) {
-            return new MathObject(0.0);
+            return new MathObject("");
         }
-
         if (colSize != rowSize) {
             throw new RuntimeException("Unable to find determinate for non-square matrix");
         }
 
-        BigDecimal scalar = matrix.getValue(0, colIdx[0]);
-        return new MathObject(cofactor(matrix, 0, colIdx[0]).getValue().multiply(scalar).add(findDeterminantLaplace(matrix, colIdx[0] + 1).getValue()));
+        MathObject determinant;
+        MathObject currentScalar = matrixToFindDeterminate.getValue(0, colIdx[0]);
+        MathObject ad;
+        MathObject bc;
+        MathObject ad_bc;
+        Matrix matrix = deleteRowCol(matrixToFindDeterminate, 0, colIdx[0]);
+        if (matrix.getColSize() == 2) {
+            MathObject a = matrix.getValue(0, 0);
+            MathObject d = matrix.getValue(1, 1);
+            ad = new MathObject("(" + a + ") * (" + d + ")");
+            MathObject b = matrix.getValue(0, 1);
+            MathObject c = matrix.getValue(1, 0);
+            bc = new MathObject("(" + b + ") * (" + c + ")");
+            ad_bc = ad;
+            ad_bc.operation(bc, "-");
+            ad_bc.addParenthesis();
+            currentScalar.addParenthesis();
+            currentScalar.operation(ad_bc, "*");
+            if (colIdx[0] - 1 % 2 == 0) {
+                currentScalar.operation(findDeterminantLaplace(matrixToFindDeterminate, colIdx[0] + 1), "+");
+            } else {
+                currentScalar.operation(findDeterminantLaplace(matrixToFindDeterminate, colIdx[0] + 1), "-");
+            }
+        } else {
+            currentScalar.operation(findDeterminantLaplace(deleteRowCol(matrixToFindDeterminate, 0, colIdx[0]), colIdx[0] + 1), "*");
+        }
+
+        determinant = currentScalar;
+
+        return determinant;
     }
 
     private static MathObject cofactor(Matrix matrix, int row, int col) {
-        if (matrix.getValue(row, col) != null) {
-            return new MathObject(matrix.getValue(row, col).multiply(findDeterminant(deleteRowCol(matrix, row, col))).multiply(BigDecimal.valueOf(Math.pow(-1.0, row + col))));
-        } else {
-            return null;
-        }
+        return findDeterminant(deleteRowCol(matrix, row, col));
     }
 
     private static Matrix multiplyMatrix(Matrix matrix, BigDecimal scalar) {
@@ -198,6 +250,9 @@ public abstract class MatrixMath {
         if (row >= matrixToTransform.getRowSize() || col >= matrixToTransform.getColSize() || row < 0 || col < 0) {
             throw new RuntimeException("Invalid row/column to remove");
         }
+        if (matrixToTransform.getColSize()-1 < 1) {
+            return matrixToTransform;
+        }
         Matrix matrix = Matrix.createMatrix(matrixToTransform.getColSize() - 1);
         int newRowIdx = 0;
         int newColIdx = 0;
@@ -205,7 +260,11 @@ public abstract class MatrixMath {
             if (i == row) continue;
             for (int j = 0; j < matrixToTransform.getColSize(); j++) {
                 if (j == col) continue;
-                matrix.setValue(newRowIdx, newColIdx, matrixToTransform.getValue(i, j));
+                if (matrixToTransform.getValue(i, j).getValue() == null) {
+                    matrix.setValue(newRowIdx, newColIdx, matrixToTransform.getValue(i, j, 0));
+                } else {
+                    matrix.setValue(newRowIdx, newColIdx, matrixToTransform.getValue(i, j));
+                }
                 newColIdx++;
             }
             newColIdx = 0;
@@ -224,11 +283,11 @@ public abstract class MatrixMath {
     private static void rowSwap(Matrix matrix, int rowIndex, int rowIndex2) {
         int numCols = matrix.getColSize();
 
-        BigDecimal hold;
+        MathObject hold;
 
         for (int k = 0; k < numCols; k++) {
-            hold = matrix.getValue(rowIndex2, k);
-            matrix.setValue(rowIndex2, k, matrix.getValue(rowIndex, k));
+            hold = matrix.getValue(rowIndex2, k, 0);
+            matrix.setValue(rowIndex2, k, matrix.getValue(rowIndex, k, 0));
             matrix.setValue(rowIndex, k, hold);
         }
     }
@@ -247,7 +306,7 @@ public abstract class MatrixMath {
         BigDecimal hold;
 
         for (int k = 0; k < numCols; k++) {
-            hold = matrix.getValue(rowIndex2, k).add(matrix.getValue(rowIndex, k));
+            hold = matrix.getValue(rowIndex2, k).getValue().add(matrix.getValue(rowIndex, k).getValue());
 
             matrix.setValue(rowIndex, k, hold);
         }
@@ -265,7 +324,7 @@ public abstract class MatrixMath {
         int numCols = matrix.getColSize();
 
         for (int k = 0; k < numCols; k++) {;
-            matrix.setValue(rowIndex, k, matrix.getValue(rowIndex, k).multiply(scalar));
+            matrix.setValue(rowIndex, k, matrix.getValue(rowIndex, k).getValue().multiply(scalar));
         }
     }
 
@@ -283,7 +342,7 @@ public abstract class MatrixMath {
         BigDecimal hold;
 
         for (int k = 0; k < numCols; k++) {
-            hold = matrix.getValue(rowIndex2, k).add(matrix.getValue(rowIndex, k).multiply(scalar));
+            hold = matrix.getValue(rowIndex2, k).getValue().add(matrix.getValue(rowIndex, k).getValue().multiply(scalar));
             matrix.setValue(rowIndex2, k, hold);
         }
 
@@ -298,7 +357,7 @@ public abstract class MatrixMath {
      */
     private static boolean isNonZeroRow(Matrix matrix, int row) {
         for (int col = 0; col < matrix.getColSize(); col++) {
-            if (!JParser.isZero(matrix.getValue(row, col))) {
+            if (matrix.getValue(row, col) != null || matrix.getValue(row, col, 0).getName() != null) {
                 return true;
             }
         }
@@ -345,22 +404,6 @@ public abstract class MatrixMath {
         return -1;
     }
 
-    private static void format(Matrix matrix, int cursor, int columnIndex, int rowIndex) {
-        int rowSize = matrix.getRowSize();
-        int colSize = matrix.getColSize();
-        while (JParser.isZero(matrix.getValue(cursor, columnIndex))) {
-            cursor++;
-            if (rowSize == cursor) {
-                cursor = rowIndex;
-                columnIndex++;
-                if (colSize == columnIndex) {
-                    break;
-                }
-            }
-        }
-        rowSwap(matrix, cursor, rowIndex);
-    }
-
     /**
      * Format entries in a Matrix by rounding them up to 4 decimal places.
      *
@@ -368,12 +411,12 @@ public abstract class MatrixMath {
      */
     private static void prettify(Matrix matrix) {
         DecimalFormat df = new DecimalFormat("#.######");
-        df.setRoundingMode(RoundingMode.UP);
+        df.setRoundingMode(RoundingMode.HALF_UP);
         int idx = 0;
         for (Vector vector : matrix.getColumns()) {
             if (isNonZeroColumn(matrix, idx, 0)) {
                 for (MathObject d : vector.getBody()) {
-                    if (JParser.isZero(d.getValue())) {
+                    if (JParser.isZero(d)) {
                         vector.setValue(idx, BigDecimal.valueOf(Long.parseLong(df.format(0))));
                     } else if (d.getValue() != null) {
                         vector.setValue(idx, BigDecimal.valueOf(Double.parseDouble(df.format(d.getValue()))).stripTrailingZeros());

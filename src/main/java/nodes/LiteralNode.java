@@ -24,6 +24,10 @@ public class LiteralNode extends ExpressionNode{
         this.value = BigDecimal.valueOf(value);
     }
 
+    public void setValue(BigDecimal value) {
+        this.value = value;
+    }
+
     /**
      * Return the value represented by this node.
      *

@@ -31,6 +31,10 @@ public enum Operator {
         return toReturn;
     }
 
+    public static String getFromOperator(Operator operator) {
+        return operator.asString;
+    }
+
     public static Operator getAsString(String op) {
         for (int i = 0; i < values().length; i++) {
             if (Operator.values()[i].asString.equals(op)) {

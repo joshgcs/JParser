@@ -2,13 +2,17 @@ package evaluator;
 
 import literals.Matrix;
 import literals.MathObject;
-import nodes.ExpressionNode;
+import nodes.*;
 import parser.Parser;
+import tokenizer.Operator;
 import tokenizer.Tokenizer;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 
 /**
  * Utility entry-point for parsing and evaluating mathematical expressions.
@@ -43,6 +47,10 @@ public abstract class JParser {
         setRoundingMode(RoundingMode.CEILING);
     }};
     private static final int currentPrecision = 10;
+
+    public static final BigDecimal NEGATIVE_ONE = new BigDecimal("-1");
+    public static final BigDecimal ZERO = new BigDecimal("0");
+    public static final BigDecimal ONE = new BigDecimal("1");
 
     /**
      * Parser instance used for the most recent parse operation.
@@ -86,11 +94,15 @@ public abstract class JParser {
         PARSER = new Parser(new Tokenizer(expression).tokenize());
         // Evaluate the parsed AST using the shared CONTEXT
         MathObject object = EVALUATOR.evaluate(PARSER.parseExpression(), CONTEXT);
-        if (isZero(object.getValue())) {
+        if (isZero(object)) {
             return new MathObject(0.0);
         }
-        object.setValue(BigDecimal.valueOf(Double.parseDouble(decimalFormat.format(object.getValue()))));
         return object;
+    }
+
+    public static ExpressionNode parse(String expression) {
+        PARSER = new Parser(new Tokenizer(expression).tokenize());
+        return PARSER.parseExpression();
     }
 
     public static MathObject evaluate(ExpressionNode node) {
@@ -108,8 +120,8 @@ public abstract class JParser {
      *
      * @param expression function definition expression
      */
-    public static void createFunction(String expression) {
-        CONTEXT.addFunction(expression);
+    public static FunctionDefinitionNode createFunction(String expression) {
+        return CONTEXT.addFunction(expression);
     }
 
     public static int getCurrentPrecision() {
@@ -151,19 +163,196 @@ public abstract class JParser {
      * @param matrix the matrix to convert
      * @return a {@link Matrix} reduced to echelon form
      */
-    public static Matrix echelonForm(Matrix matrix) {
-        return MatrixMath.reduceToEchelon(matrix);
+    public static Matrix makeTriangular(Matrix matrix) {
+        return MatrixMath.makeTriangular(matrix);
     }
 
-    public static Matrix inverse(Matrix matrix) {
+    public static Matrix inverseMatrix(Matrix matrix) {
         return MatrixMath.findInverse(matrix);
     }
 
-    public static BigDecimal determinant(Matrix matrix) {
+    public static MathObject matrixDeterminant(Matrix matrix) {
         return MatrixMath.findDeterminant(matrix);
     }
 
+    public static MathObject findDerivative(ExpressionNode root, String wrt) {
+        parseThroughTree(root);
+        MathObject derivative = new MathObject("");
+        if (root instanceof BinaryNode binaryNode) {
+            ExpressionNode left = binaryNode.getLeftChild();
+            ExpressionNode right = binaryNode.getRightChild();
+            switch (binaryNode.getOperator()) {
+                case PLUS -> derivative.operation(differentiateExpression(left, right, Operator.PLUS, wrt), "+");
+                case EXP -> derivative.operation(differentiateExpression(left, right, Operator.EXP, wrt), "+");
+                case MULT -> derivative.operation(differentiateExpression(left, right, Operator.MULT, wrt), "+");
+                case MINUS -> derivative.operation(differentiateExpression(left, right, Operator.MINUS, wrt), "+");
+                case DIV -> derivative.operation(differentiateExpression(left, right, Operator.DIV, wrt), "+");
+            }
+        } else if (root instanceof LiteralNode literalNode) {
+            return new MathObject(((BigDecimal) literalNode.getValue()).stripTrailingZeros());
+        } else if (root instanceof VariableNode variableNode) {
+            return new MathObject(variableNode.getName());
+        }
+        return derivative;
+    }
 
+    public static MathObject differentiateExpression(ExpressionNode left, ExpressionNode right, Operator operator, String wrt) {
+        MathObject differentiated = new MathObject("");
+        if (left instanceof BinaryNode) {
+            differentiated.operation(findDerivative(left, wrt), "+");
+        }
+        if (right instanceof BinaryNode) {
+            differentiated.operation(findDerivative(right, wrt), "+");
+        }
+        switch (operator) {
+            case EXP -> {
+                MathObject variable = evaluate(left);
+                MathObject exp = evaluate(right);
+                MathObject expReduced = new MathObject(exp.getValue());
+                if (exp.getValue() != null) {
+                    exp.setValue(exp.getValue().stripTrailingZeros());
+                }
+                exp.setName(exp.toString());
+                exp.operation(variable, "");
+                differentiated.combine(exp);
+                expReduced.operation(new MathObject(ONE), "-");
+                if (expReduced.getValue() != null) {
+                    if (expReduced.getValue().doubleValue() > 1) {
+                        expReduced.setValue(expReduced.getValue().stripTrailingZeros());
+                        differentiated.operation(expReduced, "^");
+                    }
+                }
+            } case MULT -> {
+                MathObject leftObject = evaluate(left);
+                if (!differentiated.getName().isEmpty()) {
+                    differentiated.addParenthesis();
+                }
+                if (leftObject.getValue() != null) {
+                    leftObject.setValue(leftObject.getValue().stripTrailingZeros());
+                }
+                differentiated = MathObject.combine(leftObject, differentiated);
+            } case MINUS, PLUS -> {
+                MathObject leftObject = findDerivative(left, wrt);
+                MathObject rightObject = findDerivative(right, wrt);
+                MathObject combined = new MathObject("");
+                if (leftObject.isCharacter()) {
+                    System.out.println(leftObject);
+                } else if (rightObject.isCharacter()) {
+                    if (!leftObject.isCharacter()) {
+                        if (rightObject.toString().equals(wrt)) {
+                            combined.combine(new MathObject(1), (operator.equals(Operator.MINUS) ? "-" : ""));
+                        } else {
+                            combined.combine(rightObject, (operator.equals(Operator.MINUS) ? "-" : ""));
+                        }
+                    }
+                }
+                differentiated = combined;
+            } case DIV -> {
+                MathObject leftObject = evaluate(left);
+                MathObject rightObject = evaluate(right);
+                leftObject.addParenthesis();
+                rightObject.addParenthesis();
+
+                MathObject fx = findDerivative(left, wrt);
+                fx.addParenthesis();
+                MathObject gx = findDerivative(right, wrt);
+                gx.addParenthesis();
+
+                MathObject topLeft = MathObject.combine(fx, rightObject);
+                MathObject topRight = MathObject.combine(leftObject, gx);
+
+                MathObject bottom = MathObject.combine(rightObject, new MathObject("^2"));
+
+                topLeft.combine(topRight, "-");
+                topLeft.addParenthesis();
+                topLeft.combine(bottom, "/");
+                topLeft.addParenthesis();
+                differentiated = topLeft;
+            }
+        }
+        return differentiated;
+    }
+
+    public static MathObject differentiateValue(ExpressionNode value, String wrt) {
+        MathObject differentiated = new MathObject("");
+
+        System.out.println(value.getValue());
+
+
+        return differentiated;
+    }
+
+    public static List<MathObject> findRoots(String expression, String... variables) {
+        ExpressionNode body = createFunction(createFunctionFromPolynomial(expression, variables));
+        List<MathObject> objects = new ArrayList<>();
+        int rootsFound = 0;
+        int degree = findPolynomialDegree(body);
+        BigDecimal lastValue;
+        while (rootsFound < degree) {
+
+
+            rootsFound++;
+        }
+
+        return objects;
+    }
+
+    public static String parseThroughTree(ExpressionNode root) {
+        if (root instanceof BinaryNode binaryNode) {
+            binaryNode.getLeftChild().setParent(binaryNode);
+            binaryNode.getRightChild().setParent(binaryNode);
+            System.out.println(binaryNode.getOperator());
+            System.out.println(binaryNode.getLeftChild().getValue());
+            System.out.println(binaryNode.getLeftChild().getValue());
+            return parseThroughTree(binaryNode.getLeftChild()) + Operator.getFromOperator(binaryNode.getOperator()) + parseThroughTree(binaryNode.getRightChild());
+        } else if (root instanceof LiteralNode literalNode) {
+            System.out.println(literalNode.getValue());
+            return literalNode.getValue().toString();
+        } else if (root instanceof UnaryNode unaryNode) {
+            System.out.println(unaryNode.getValue());
+            unaryNode.getChild().setParent(unaryNode);
+            return parseThroughTree(unaryNode.getChild());
+        } else if (root instanceof VariableNode variableNode) {
+            System.out.println(variableNode.getName());
+            return variableNode.getValue().toString();
+        } else {
+            return "";
+        }
+    }
+
+    public static String createFunctionFromPolynomial(String expression, String... variables) {
+        StringBuilder func = new StringBuilder();
+        String identifier = getSaltString();
+        while (CONTEXT.containsFunction(identifier)) {
+            identifier = getSaltString();
+        }
+        func.append(identifier).append("(");
+        int idx = 1;
+        for (String s : variables) {
+            func.append(s);
+            if (idx < variables.length) {
+                func.append(",");
+            }
+        }
+        func.append(") = ").append(expression);
+        return func.toString();
+    }
+
+    private static int findPolynomialDegree(ExpressionNode body, int... currentHighestDegree) {
+        if (currentHighestDegree.length == 0) {
+            currentHighestDegree = new int[]{1};
+        }
+        int highestDegree = currentHighestDegree[0];
+        if (body instanceof BinaryNode binaryNode && binaryNode.getOperator().equals(Operator.EXP)) {
+            if (!(binaryNode.getLeftChild() instanceof LiteralNode) && binaryNode.getRightChild() instanceof LiteralNode node) {
+                highestDegree = Math.max(highestDegree, ((BigDecimal) node.getValue()).intValue());
+            }
+            highestDegree = Math.max(findPolynomialDegree(binaryNode.getLeftChild()), Math.max(findPolynomialDegree(binaryNode.getRightChild()), highestDegree));
+        } else if (body instanceof BinaryNode binaryNode) {
+            highestDegree = Math.max(findPolynomialDegree(binaryNode.getLeftChild()), Math.max(findPolynomialDegree(binaryNode.getRightChild()), highestDegree));
+        }
+        return highestDegree;
+    }
 
     /**
      * Determine whether a value should be considered zero (with epsilon tolerance).
@@ -171,7 +360,23 @@ public abstract class JParser {
      * @param val numeric value to test
      * @return true if value is (approximately) zero
      */
-    public static boolean isZero(BigDecimal val) {
-        return Math.abs(val.doubleValue()) <= 0.0000001;
+    public static boolean isZero(MathObject val) {
+        if (val.getValue() != null) {
+            return Math.abs(val.getValue().doubleValue()) <= 0.0000001;
+        } else {
+            return val.getName() != null && val.getName().isEmpty();
+        }
+    }
+
+    private static String getSaltString() {
+        String SALTCHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        StringBuilder salt = new StringBuilder();
+        Random rnd = new Random();
+        while (salt.length() < 3) { // length of the random string.
+            int index = (int) (rnd.nextFloat() * SALTCHARS.length());
+            salt.append(SALTCHARS.charAt(index));
+        }
+        String saltStr = salt.toString();
+        return saltStr;
     }
 }

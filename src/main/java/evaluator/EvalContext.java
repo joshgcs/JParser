@@ -107,7 +107,7 @@ public class EvalContext {
      * @return the created {@link FunctionDefinition}
      * @throws RuntimeException if parsing fails or the function already exists
      */
-    public FunctionDefinition addFunction(String func) {
+    public FunctionDefinitionNode addFunction(String func) {
         Tokenizer tokenizer = new Tokenizer(func);
         Parser parser = new Parser(tokenizer.tokenize());
         ExpressionNode root = parser.parseExpression();
@@ -119,7 +119,7 @@ public class EvalContext {
             FunctionDefinition def = defineFunction(functionDefinitionNode);
             def.setExpression(func);
             functions.put(def.getName(), def);
-            return def;
+            return functionDefinitionNode;
         }
         throw new RuntimeException("Unable to parse function " + func);
     }
